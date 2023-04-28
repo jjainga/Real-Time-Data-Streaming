@@ -3,7 +3,7 @@ import requests
 import time
 from dotenv import load_dotenv
 import os
-
+import datetime
 
 load_dotenv()
 
@@ -16,22 +16,31 @@ producer_conf = {
 
 producer = Producer(producer_conf)
 
-def get_stock_price():
-    url = f'https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={STOCK_SYMBOL}&apikey={API_KEY}'
-    response = requests.get(url)
-    data = response.json()
-    # print(data['Global Quote']['05. price'])
-    if 'Global Quote' in data:
+tech_stock_symbols = ['AAPL', 'MSFT', 'GOOGL', 'FB', 'NVDA', 'ADBE', 'CRM', 'TSM', 'PYPL', 'INTC', 'CSCO', 'ASML', 'AVGO', 'TXN', 'QCOM', 'NFLX', 'AMAT', 'AMD', 'BIDU', 'JD']
+
+
+def get_stock_price(symbol):
+    try:
+        url = f'https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={API_KEY}'
+        response = requests.get(url)
+        data = response.json()
         stock_price = float(data['Global Quote']['05. price'])
-        time.sleep(10)
+
         return stock_price
-    else:
-        print('Error: response missing required data')
-        print(data)
+    except Exception as e:
+        print(f'Error getting stock price for {symbol}: {e}')
         return None
 
 while True:
-    stock_price = get_stock_price()
-    producer.produce('stock_prices', str(stock_price).encode())
-    producer.flush() #wait for message delivery
-    time.sleep(5)
+    for stock in tech_stock_symbols:
+        stock_price = get_stock_price(stock)
+        if stock_price is not None:
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            message = f"{stock},{stock_price},{current_time}".encode()
+            try:
+                producer.produce('stock_prices', message)
+                producer.flush()
+            except Exception as e:
+                print(f'Error producing message for {stock}: {e}')
+        time.sleep(15)
+
